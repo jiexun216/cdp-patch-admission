@@ -1,0 +1,77 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-cdp-patch-admission-customizer-cfg
+  annotations:
+    cert-manager.io/inject-ca-from: cdp-customizer/patch-webhook-cert
+  labels:
+    app: cdp-patch-admission-customizer
+webhooks:
+  - name: mutating-cdp-patch-admission-console.datacreating.com
+    clientConfig:
+      service:
+        name: patch-admission-manager
+        namespace: cdp-customizer
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["apps","batch"]
+        apiVersions: ["v1"]
+        resources: ["deployments","statefulsets","jobs"]
+    namespaceSelector:
+      matchExpressions:
+        # key exist
+        - key: monitoring-platform-access
+          operator: Exists
+    timeoutSeconds: 5
+  - name: mutating-cdp-patch-admission-cml.datacreating.com
+    clientConfig:
+      service:
+        name: patch-admission-manager
+        namespace: cdp-customizer
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["apps","batch"]
+        apiVersions: ["v1"]
+        resources: ["deployments","statefulsets","jobs"]
+    namespaceSelector:
+      matchExpressions:
+        # key exist
+        - key: associatedCRP
+          operator: Exists
+    timeoutSeconds: 5
+  - name: mutating-cdp-patch-admission-implala.datacreating.com
+    clientConfig:
+      service:
+        name: patch-admission-manager
+        namespace: cdp-customizer
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["apps","batch"]
+        apiVersions: ["v1"]
+        resources: ["deployments","statefulsets","jobs"]
+    namespaceSelector:
+      matchExpressions:
+        # key exist
+        - key: istio-injection
+          operator: Exists
+    timeoutSeconds: 5
+  - name: mutating-cdp-patch-admission-monitoring.datacreating.com
+    clientConfig:
+      service:
+        name: patch-admission-manager
+        namespace: cdp-customizer
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE"]
+        apiGroups: ["apps","batch"]
+        apiVersions: ["v1"]
+        resources: ["deployments","statefulsets","jobs"]
+    namespaceSelector:
+      matchExpressions:
+        # key exist
+        - key: cdp.cloudera/version
+          operator: Exists
+    timeoutSeconds: 5

@@ -1,0 +1,26 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: patch-webhook-cert
+  namespace: cdp-customizer
+spec:
+  secretName: patch-customizer-admission-manager-certs
+  subject:
+    organizations:
+    - dce
+  usages:
+    - digital signature
+    - key encipherment
+    - server auth
+    - client auth
+  dnsNames:
+  - patch-admission-manager
+  - patch-admission-manager.cdp-customizer
+  - patch-admission-manager.cdp-customizer.svc
+  - patch-admission-manager.cdp-customizer.svc.cluster.local
+  ipAddresses:
+  - 127.0.0.1
+  issuerRef:
+    name: k8s-ca-issuer
+    kind: ClusterIssuer
+    group: cert-manager.io

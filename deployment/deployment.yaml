@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patch-customizer-admission-manager
+  labels:
+    app: cdp-patch-admission-customizer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cdp-patch-admission-customizer
+  template:
+    metadata:
+      labels:
+        app: cdp-patch-admission-customizer
+    spec:
+      serviceAccount: patch-customizer-admission-manager-sa
+      containers:
+        - name: cdp-patch-admission-customizer
+          env:
+            - name: ADD_SECURITRYCONEXT_PER_POD
+              value: "false"
+          image: daocloud.io/daocloud/cdp-patch-admission-customizer:latest
+          imagePullPolicy: Always
+          args:
+            - -tlsCertFile=/etc/webhook/certs/tls.crt
+            - -tlsKeyFile=/etc/webhook/certs/tls.key
+            - -alsologtostderr
+            - -v=4
+            - 2>&1
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /etc/webhook/certs
+              readOnly: true
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: patch-customizer-admission-manager-certs
+      ## By DaoCloud
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+      ##
