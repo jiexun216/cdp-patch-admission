@@ -46,7 +46,7 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 		if value, ok := securitycontextMap["deployment."+deployment.Name]; ok {
 			// modify
 			var deployTemplate appsv1.Deployment
-			if err := json.Unmarshal([]byte(value), &deployTemplate); err != nil {
+			if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", deployment.Namespace, -1)), &deployTemplate); err != nil {
 				glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
 			}
 			// pod level
@@ -158,7 +158,7 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 			if strings.Contains("statefulset."+statefulset.Name, k) {
 				// modify
 				var stsTemplate appsv1.StatefulSet
-				if err := json.Unmarshal([]byte(value), &stsTemplate); err != nil {
+				if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", statefulset.Namespace, -1)), &stsTemplate); err != nil {
 					glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
 				}
 				// pod level
@@ -268,7 +268,7 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 			if strings.Contains("job."+job.Name, k) {
 				// modify
 				var jobTemplate batchv1.Job
-				if err := json.Unmarshal([]byte(value), &jobTemplate); err != nil {
+				if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", job.Namespace, -1)), &jobTemplate); err != nil {
 					glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
 				}
 				// pod level
