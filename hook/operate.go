@@ -56,7 +56,7 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 					Path:  "/spec/template/spec/securityContext",
 					Value: deployTemplate.Spec.Template.Spec.SecurityContext,
 				}
-				glog.Infof("add StatefulSet securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
+				glog.Infof("add Deployment securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
 				patch = append(patch, replaceSecurityContext)
 			}
 
@@ -70,6 +70,17 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 				}
 				glog.Infof("add Deployment Volumes  /spec/template/spec/Volumes for value: %v", replaceVolumes)
 				patch = append(patch, replaceVolumes)
+			}
+			// jiexun pod level affinity
+			if deployTemplate.Spec.Template.Spec.Affinity != nil {
+				// modify /spec/template/spec/affinity
+				replaceAffinity := patchOperation{
+					Op:    "replace",
+					Path:  "/spec/template/spec/affinity",
+					Value: deployTemplate.Spec.Template.Spec.Affinity,
+				}
+				glog.Infof("add Deployment Affinity  /spec/template/spec/affinity for value: %v", replaceAffinity)
+				patch = append(patch, replaceAffinity)
 			}
 
 			// initContainers level
@@ -172,6 +183,17 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 					glog.Infof("add StatefulSet Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
 					patch = append(patch, replaceVolumes)
 				}
+				// jiexun pod level affinity
+				if stsTemplate.Spec.Template.Spec.Affinity != nil {
+					// modify /spec/template/spec/affinity
+					replaceAffinity := patchOperation{
+						Op:    "replace",
+						Path:  "/spec/template/spec/affinity",
+						Value: stsTemplate.Spec.Template.Spec.Affinity,
+					}
+					glog.Infof("add StatefulSet Affinity  /spec/template/spec/affinity for value: %v", replaceAffinity)
+					patch = append(patch, replaceAffinity)
+				}
 
 				// initContainers level
 				if len(stsTemplate.Spec.Template.Spec.InitContainers) > 0 {
@@ -256,7 +278,7 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 						Path:  "/spec/template/spec/securityContext",
 						Value: jobTemplate.Spec.Template.Spec.SecurityContext,
 					}
-					glog.Infof("add StatefulSet securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
+					glog.Infof("add Job securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
 					patch = append(patch, replaceSecurityContext)
 				}
 
@@ -268,8 +290,20 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 						Path:  "/spec/template/spec/volumes",
 						Value: jobTemplate.Spec.Template.Spec.Volumes,
 					}
-					glog.Infof("add StatefulSet Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
+					glog.Infof("add Job Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
 					patch = append(patch, replaceVolumes)
+				}
+
+				// jiexun pod level affinity
+				if jobTemplate.Spec.Template.Spec.Affinity != nil {
+					// modify /spec/template/spec/affinity
+					replaceAffinity := patchOperation{
+						Op:    "replace",
+						Path:  "/spec/template/spec/affinity",
+						Value: jobTemplate.Spec.Template.Spec.Affinity,
+					}
+					glog.Infof("add Job Affinity  /spec/template/spec/affinity for value: %v", replaceAffinity)
+					patch = append(patch, replaceAffinity)
 				}
 
 				// initContainers level
