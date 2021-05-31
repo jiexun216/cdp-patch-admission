@@ -18,8 +18,8 @@ spec:
       containers:
         - name: cdp-patch-admission-customizer
           env:
-            - name: ADD_SECURITRYCONEXT_PER_POD
-              value: "false"
+            - name: CONFIGMAP_LABEL_SELECTOR_KEY
+              value: "cdp.cloudera.io/security-context"
           image: daocloud.io/daocloud/cdp-patch-admission-customizer:latest
           imagePullPolicy: Always
           args:

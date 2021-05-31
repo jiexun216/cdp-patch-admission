@@ -3,6 +3,7 @@ package hook
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strconv"
 	"strings"
 
@@ -401,11 +402,13 @@ func getConfigMap() map[string]string {
 
 	configMapClient := clientset.CoreV1().ConfigMaps("cdp-customizer")
 	// labelSelector cdp.cloudera.io/security-context
+	labelSelectorKey := os.Getenv("CONFIGMAP_LABEL_SELECTOR_KEY")
+	glog.Infof("get the env CONFIGMAP_LABEL_SELECTOR_KEY for value: %v", labelSelectorKey)
 	labelSelector := metav1.LabelSelector{
 		//MatchLabels: map[string]string{"cdp.cloudera.io/security-context":"true"},
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      "cdp.cloudera.io/security-context",
+				Key: labelSelectorKey,
 				Operator: "Exists",
 			},
 		},
