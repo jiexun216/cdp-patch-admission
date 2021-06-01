@@ -73,38 +73,39 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 				patch = append(patch, replaceVolumes)
 			}
 			// jiexun pod level affinity
-			if deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-				// modify /spec/template/spec/affinity/podAntiAffinity
-				replacePodAntiAffinity := patchOperation{
-					Op:    "replace",
-					Path:  "/spec/template/spec/affinity/podAntiAffinity",
-					Value: deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+			if deployTemplate.Spec.Template.Spec.Affinity != nil {
+				if deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+					// modify /spec/template/spec/affinity/podAntiAffinity
+					replacePodAntiAffinity := patchOperation{
+						Op:    "replace",
+						Path:  "/spec/template/spec/affinity/podAntiAffinity",
+						Value: deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+					}
+					glog.Infof("add Deployment Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
+					patch = append(patch, replacePodAntiAffinity)
 				}
-				glog.Infof("add Deployment Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-				patch = append(patch, replacePodAntiAffinity)
+				if deployTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
+					// modify /spec/template/spec/affinity/podAffinity
+					replacePodAffinity := patchOperation{
+						Op:    "replace",
+						Path:  "/spec/template/spec/affinity/podAffinity",
+						Value: deployTemplate.Spec.Template.Spec.Affinity.PodAffinity,
+					}
+					glog.Infof("add Deployment Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
+					patch = append(patch, replacePodAffinity)
+				}
+				if deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
+					// modify /spec/template/spec/affinity/nodeAffinity
+					replaceNodeAffinity := patchOperation{
+						Op:    "replace",
+						Path:  "/spec/template/spec/affinity/nodeAffinity",
+						Value: deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
+					}
+					glog.Infof("add Deployment Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
+					patch = append(patch, replaceNodeAffinity)
+				}
 			}
 
-			if deployTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-				// modify /spec/template/spec/affinity/podAffinity
-				replacePodAffinity := patchOperation{
-					Op:    "replace",
-					Path:  "/spec/template/spec/affinity/podAffinity",
-					Value: deployTemplate.Spec.Template.Spec.Affinity.PodAffinity,
-				}
-				glog.Infof("add Deployment Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-				patch = append(patch, replacePodAffinity)
-			}
-
-			if deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-				// modify /spec/template/spec/affinity/nodeAffinity
-				replaceNodeAffinity := patchOperation{
-					Op:    "replace",
-					Path:  "/spec/template/spec/affinity/nodeAffinity",
-					Value: deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
-				}
-				glog.Infof("add Deployment Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-				patch = append(patch, replaceNodeAffinity)
-			}
 
 			// initContainers level
 			if len(deployTemplate.Spec.Template.Spec.InitContainers) > 0 {
@@ -217,38 +218,41 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 					patch = append(patch, replaceVolumes)
 				}
 				// jiexun pod level affinity
-				if stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-					// modify /spec/template/spec/affinity/podAntiAffinity
-					replacePodAntiAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAntiAffinity",
-						Value: stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+				if stsTemplate.Spec.Template.Spec.Affinity != nil {
+					if stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+						// modify /spec/template/spec/affinity/podAntiAffinity
+						replacePodAntiAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/podAntiAffinity",
+							Value: stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+						}
+						glog.Infof("add StatefulSet Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
+						patch = append(patch, replacePodAntiAffinity)
 					}
-					glog.Infof("add StatefulSet Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-					patch = append(patch, replacePodAntiAffinity)
+
+					if stsTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
+						// modify /spec/template/spec/affinity/podAffinity
+						replacePodAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/podAffinity",
+							Value: stsTemplate.Spec.Template.Spec.Affinity.PodAffinity,
+						}
+						glog.Infof("add StatefulSet Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
+						patch = append(patch, replacePodAffinity)
+					}
+
+					if stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
+						// modify /spec/template/spec/affinity/nodeAffinity
+						replaceNodeAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/nodeAffinity",
+							Value: stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
+						}
+						glog.Infof("add StatefulSet Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
+						patch = append(patch, replaceNodeAffinity)
+					}
 				}
 
-				if stsTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-					// modify /spec/template/spec/affinity/podAffinity
-					replacePodAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAffinity",
-						Value: stsTemplate.Spec.Template.Spec.Affinity.PodAffinity,
-					}
-					glog.Infof("add StatefulSet Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-					patch = append(patch, replacePodAffinity)
-				}
-
-				if stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-					// modify /spec/template/spec/affinity/nodeAffinity
-					replaceNodeAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/nodeAffinity",
-						Value: stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
-					}
-					glog.Infof("add StatefulSet Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-					patch = append(patch, replaceNodeAffinity)
-				}
 
 				// initContainers level
 				if len(stsTemplate.Spec.Template.Spec.InitContainers) > 0 {
@@ -361,38 +365,37 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 				}
 
 				// jiexun pod level affinity
-
-				if jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-					// modify /spec/template/spec/affinity/podAntiAffinity
-					replacePodAntiAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAntiAffinity",
-						Value: jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+				if jobTemplate.Spec.Template.Spec.Affinity != nil {
+					if jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+						// modify /spec/template/spec/affinity/podAntiAffinity
+						replacePodAntiAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/podAntiAffinity",
+							Value: jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
+						}
+						glog.Infof("add Job Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
+						patch = append(patch, replacePodAntiAffinity)
 					}
-					glog.Infof("add Job Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-					patch = append(patch, replacePodAntiAffinity)
-				}
-
-				if jobTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-					// modify /spec/template/spec/affinity/podAffinity
-					replacePodAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAffinity",
-						Value: jobTemplate.Spec.Template.Spec.Affinity.PodAffinity,
+					if jobTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
+						// modify /spec/template/spec/affinity/podAffinity
+						replacePodAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/podAffinity",
+							Value: jobTemplate.Spec.Template.Spec.Affinity.PodAffinity,
+						}
+						glog.Infof("add Job Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
+						patch = append(patch, replacePodAffinity)
 					}
-					glog.Infof("add Job Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-					patch = append(patch, replacePodAffinity)
-				}
-
-				if jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-					// modify /spec/template/spec/affinity/nodeAffinity
-					replaceNodeAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/nodeAffinity",
-						Value: jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
+					if jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
+						// modify /spec/template/spec/affinity/nodeAffinity
+						replaceNodeAffinity := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/affinity/nodeAffinity",
+							Value: jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
+						}
+						glog.Infof("add Job Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
+						patch = append(patch, replaceNodeAffinity)
 					}
-					glog.Infof("add Job Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-					patch = append(patch, replaceNodeAffinity)
 				}
 
 				// initContainers level
