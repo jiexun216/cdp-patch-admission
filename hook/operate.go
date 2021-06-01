@@ -62,12 +62,12 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 			}
 
 			// pod level Volumes
-			if deployTemplate.Spec.Template.Spec.Volumes != nil {
+			if len(deployTemplate.Spec.Template.Spec.Volumes) > 0 {
 				// modify /spec/template/spec/volumes
 				replaceVolumes := patchOperation{
 					Op:    "replace",
 					Path:  "/spec/template/spec/volumes",
-					Value: deployTemplate.Spec.Template.Spec.Volumes,
+					Value: append(deployment.Spec.Template.Spec.Volumes, deployTemplate.Spec.Template.Spec.Volumes...),
 				}
 				glog.Infof("add Deployment Volumes  /spec/template/spec/Volumes for value: %v", replaceVolumes)
 				patch = append(patch, replaceVolumes)
@@ -114,19 +114,23 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 					for _, val := range deployTemplate.Spec.Template.Spec.InitContainers {
 						if val.Name == initContainers[i].Name {
 							// only add securityContext initcontainers
-							replaceSecurityContext := patchOperation{
-								Op:    "replace",
-								Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-								Value: val.SecurityContext,
+							if val.SecurityContext != nil {
+								replaceSecurityContext := patchOperation{
+									Op:    "replace",
+									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
+									Value: val.SecurityContext,
+								}
+								patch = append(patch, replaceSecurityContext)
 							}
-							patch = append(patch, replaceSecurityContext)
 							// only add Volumes initcontainers
-							replaceVolumeMounts := patchOperation{
-								Op:    "replace",
-								Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-								Value: val.VolumeMounts,
+							if len(val.VolumeMounts) > 0 {
+								replaceVolumeMounts := patchOperation{
+									Op:    "replace",
+									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
+									Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
+								}
+								patch = append(patch, replaceVolumeMounts)
 							}
-							patch = append(patch, replaceVolumeMounts)
 						}
 					}
 				}
@@ -140,19 +144,25 @@ func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, avail
 					for _, val := range deployTemplate.Spec.Template.Spec.Containers {
 						if val.Name == containers[i].Name {
 							// only add securityContext containers
-							replaceSecurityContext := patchOperation{
-								Op:    "replace",
-								Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-								Value: val.SecurityContext,
+							if val.SecurityContext != nil {
+								replaceSecurityContext := patchOperation{
+									Op:    "replace",
+									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
+									Value: val.SecurityContext,
+								}
+								patch = append(patch, replaceSecurityContext)
 							}
-							patch = append(patch, replaceSecurityContext)
+
 							// only add volumeMounts containers
-							replaceVolumeMounts := patchOperation{
-								Op:    "replace",
-								Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-								Value: val.VolumeMounts,
+							if len(val.VolumeMounts) > 0 {
+								replaceVolumeMounts := patchOperation{
+									Op:    "replace",
+									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
+									Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
+								}
+								patch = append(patch, replaceVolumeMounts)
 							}
-							patch = append(patch, replaceVolumeMounts)
+
 						}
 					}
 				}
@@ -196,12 +206,12 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 				}
 
 				// pod level volumes
-				if stsTemplate.Spec.Template.Spec.Volumes != nil {
+				if len(stsTemplate.Spec.Template.Spec.Volumes) > 0 {
 					// modify /spec/template/spec/volumes
 					replaceVolumes := patchOperation{
 						Op:    "replace",
 						Path:  "/spec/template/spec/volumes",
-						Value: stsTemplate.Spec.Template.Spec.Volumes,
+						Value: append(statefulset.Spec.Template.Spec.Volumes, stsTemplate.Spec.Template.Spec.Volumes...),
 					}
 					glog.Infof("add StatefulSet Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
 					patch = append(patch, replaceVolumes)
@@ -248,19 +258,24 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 						for _, val := range stsTemplate.Spec.Template.Spec.InitContainers {
 							if val.Name == initContainers[i].Name {
 								// only add securityContext initcontainers
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
+								if val.SecurityContext != nil {
+									replaceSecurityContext := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
+										Value: val.SecurityContext,
+									}
+									patch = append(patch, replaceSecurityContext)
 								}
-								patch = append(patch, replaceSecurityContext)
 								// only add volumeMounts initcontainers
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: val.VolumeMounts,
+								if len(val.VolumeMounts) > 0 {
+									replaceVolumeMounts := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
+										Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
+									}
+									patch = append(patch, replaceVolumeMounts)
 								}
-								patch = append(patch, replaceVolumeMounts)
+
 							}
 						}
 					}
@@ -274,19 +289,25 @@ func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, av
 						for _, val := range stsTemplate.Spec.Template.Spec.Containers {
 							if val.Name == containers[i].Name {
 								// only add securityContext containers
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
+								if val.SecurityContext != nil {
+									replaceSecurityContext := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
+										Value: val.SecurityContext,
+									}
+									patch = append(patch, replaceSecurityContext)
 								}
-								patch = append(patch, replaceSecurityContext)
+
 								// only add volumeMounts containers
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: val.VolumeMounts,
+								if len(val.VolumeMounts) > 0 {
+									replaceVolumeMounts := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
+										Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
+									}
+									patch = append(patch, replaceVolumeMounts)
 								}
-								patch = append(patch, replaceVolumeMounts)
+
 							}
 						}
 					}
@@ -328,12 +349,12 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 				}
 
 				// pod level Volumes
-				if jobTemplate.Spec.Template.Spec.Volumes != nil {
+				if len(jobTemplate.Spec.Template.Spec.Volumes) > 0 {
 					// modify /spec/template/spec/volumes
 					replaceVolumes := patchOperation{
 						Op:    "replace",
 						Path:  "/spec/template/spec/volumes",
-						Value: jobTemplate.Spec.Template.Spec.Volumes,
+						Value: append(job.Spec.Template.Spec.Volumes, jobTemplate.Spec.Template.Spec.Volumes...),
 					}
 					glog.Infof("add Job Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
 					patch = append(patch, replaceVolumes)
@@ -382,19 +403,25 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 						for _, val := range jobTemplate.Spec.Template.Spec.InitContainers {
 							if val.Name == initContainers[i].Name {
 								// only add securityContext initcontainers
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
+								if val.SecurityContext != nil {
+									replaceSecurityContext := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
+										Value: val.SecurityContext,
+									}
+									patch = append(patch, replaceSecurityContext)
 								}
-								patch = append(patch, replaceSecurityContext)
+
 								// only add VolumeMounts initcontainers
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: val.VolumeMounts,
+								if len(val.VolumeMounts) > 0 {
+									replaceVolumeMounts := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
+										Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
+									}
+									patch = append(patch, replaceVolumeMounts)
 								}
-								patch = append(patch, replaceVolumeMounts)
+
 							}
 						}
 					}
@@ -408,19 +435,24 @@ func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[
 						for _, val := range jobTemplate.Spec.Template.Spec.Containers {
 							if val.Name == containers[i].Name {
 								// only add securityContext containers
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
+								if val.SecurityContext != nil {
+									replaceSecurityContext := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
+										Value: val.SecurityContext,
+									}
+									patch = append(patch, replaceSecurityContext)
 								}
-								patch = append(patch, replaceSecurityContext)
 								// only add VolumeMounts containers
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: val.VolumeMounts,
+								if len(val.VolumeMounts) > 0 {
+									replaceVolumeMounts := patchOperation{
+										Op:    "replace",
+										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
+										Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
+									}
+									patch = append(patch, replaceVolumeMounts)
 								}
-								patch = append(patch, replaceVolumeMounts)
+
 							}
 						}
 					}
