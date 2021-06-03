@@ -197,11 +197,11 @@ func (whsvr *WebhookServer) mutate(ar *v1beta1.AdmissionReview) *v1beta1.Admissi
 		err        error
 	)
 	if req.Kind.Kind == "Deployment" {
-		patchBytes, err = createDeploymentAddSecurityContextPatch(deployment, availableAnnotations, annotations)
+		patchBytes, err = createRuntimeObjectAddContextPatch(&deployment, availableAnnotations, annotations)
 	} else if req.Kind.Kind == "StatefulSet" {
-		patchBytes, err = createStatefulsetAddSecurityContextPatch(statefulset, availableAnnotations, annotations)
+		patchBytes, err = createRuntimeObjectAddContextPatch(&statefulset, availableAnnotations, annotations)
 	} else {
-		patchBytes, err = createJobAddSecurityContextPatch(job, availableAnnotations, annotations)
+		patchBytes, err = createRuntimeObjectAddContextPatch(&job, availableAnnotations, annotations)
 	}
 
 	if err != nil {

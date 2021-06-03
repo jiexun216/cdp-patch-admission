@@ -3,6 +3,7 @@ package hook
 import (
 	"context"
 	"encoding/json"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"strconv"
 	"strings"
@@ -17,456 +18,194 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-//1.# console
-//monitoring-platform-access
-//2.# cml
-//associatedCRP
-//4.# warehouse
-//istio-injection
-//5.# compute
-//istio-injection
-//6.# implala
-//istio-injection
-//7.# monitoring
-//cdp.cloudera/version
 
-//3.# cml-user
-//ds-parent-namespace
 
-//only the # cml-user//ds-parent-namespace//
-// cdp-patch-admission admission is to add securityContext
-func createDeploymentAddSecurityContextPatch(deployment appsv1.Deployment, availableAnnotations map[string]string, annotations map[string]string) ([]byte, error) {
+// pod level securityContext
+func patchPodSecurityContext(patch *[]patchOperation, podSecurityContext *corev1.PodSecurityContext)  {
+	if podSecurityContext != nil {
+		// modify /spec/template/spec/securityContext
+		replaceSecurityContext := patchOperation{
+			Op:    "replace",
+			Path:  "/spec/template/spec/securityContext",
+			Value: podSecurityContext,
+		}
+		glog.Infof("add  securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
+		*patch = append(*patch, replaceSecurityContext)
+	}
+}
+
+// pod level Volumes
+func patchPodVolumes(patch *[]patchOperation, preVolume []corev1.Volume, appendVolumes []corev1.Volume)  {
+	if len(appendVolumes) > 0 {
+		// modify /spec/template/spec/volumes
+		replaceVolumes := patchOperation{
+			Op:    "replace",
+			Path:  "/spec/template/spec/volumes",
+			Value: append(preVolume, appendVolumes...),
+		}
+		glog.Infof("add  Volumes  /spec/template/spec/Volumes for value: %v", replaceVolumes)
+		*patch = append(*patch, replaceVolumes)
+	}
+}
+
+// pod level affinity
+func patchPodAffinity(patch *[]patchOperation, affinity *corev1.Affinity) {
+	if affinity != nil {
+		if affinity.PodAntiAffinity != nil {
+			// modify /spec/template/spec/affinity/podAntiAffinity
+			replacePodAntiAffinity := patchOperation{
+				Op:    "replace",
+				Path:  "/spec/template/spec/affinity/podAntiAffinity",
+				Value: affinity.PodAntiAffinity,
+			}
+			glog.Infof("add  Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
+			*patch = append(*patch, replacePodAntiAffinity)
+		}
+		if affinity.PodAffinity != nil {
+			// modify /spec/template/spec/affinity/podAffinity
+			replacePodAffinity := patchOperation{
+				Op:    "replace",
+				Path:  "/spec/template/spec/affinity/podAffinity",
+				Value: affinity.PodAffinity,
+			}
+			glog.Infof("add Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
+			*patch = append(*patch, replacePodAffinity)
+		}
+		if affinity.NodeAffinity != nil {
+			// modify /spec/template/spec/affinity/nodeAffinity
+			replaceNodeAffinity := patchOperation{
+				Op:    "replace",
+				Path:  "/spec/template/spec/affinity/nodeAffinity",
+				Value: affinity.NodeAffinity,
+			}
+			glog.Infof("add Affinity NodeAffinity /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
+			*patch = append(*patch, replaceNodeAffinity)
+		}
+	}
+}
+
+// initContainers level securityContext volumeMounts
+func patchInitContainers(patch *[]patchOperation, templateInitContainers []corev1.Container, preInitContainers []corev1.Container)  {
+	if len(templateInitContainers) > 0 {
+		for i := 0; i < len(preInitContainers); i++ {
+			for _, val := range templateInitContainers {
+				if val.Name == preInitContainers[i].Name {
+					// only add securityContext initcontainers
+					if val.SecurityContext != nil {
+						replaceSecurityContext := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
+							Value: val.SecurityContext,
+						}
+						*patch = append(*patch, replaceSecurityContext)
+					}
+					// only add Volumes initcontainers
+					if len(val.VolumeMounts) > 0 {
+						replaceVolumeMounts := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
+							Value: append(preInitContainers[i].VolumeMounts, val.VolumeMounts...),
+						}
+						*patch = append(*patch, replaceVolumeMounts)
+					}
+				}
+			}
+		}
+	}
+}
+
+
+// containers level securityContext volumeMounts
+func patchContainers(patch *[]patchOperation, templateContainers []corev1.Container, preContainers []corev1.Container) {
+	if len(templateContainers) > 0 {
+		for i := 0; i < len(preContainers); i++ {
+			for _, val := range templateContainers {
+				if val.Name == preContainers[i].Name {
+					// only add securityContext containers
+					if val.SecurityContext != nil {
+						replaceSecurityContext := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
+							Value: val.SecurityContext,
+						}
+						*patch = append(*patch, replaceSecurityContext)
+					}
+
+					// only add volumeMounts containers
+					if len(val.VolumeMounts) > 0 {
+						replaceVolumeMounts := patchOperation{
+							Op:    "replace",
+							Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
+							Value: append(preContainers[i].VolumeMounts, val.VolumeMounts...),
+						}
+						*patch = append(*patch, replaceVolumeMounts)
+					}
+
+				}
+			}
+		}
+	}
+}
+
+
+func createRuntimeObjectAddContextPatch(object runtime.Object, availableAnnotations map[string]string, annotations map[string]string) ([]byte, error) {
 	var patch []patchOperation
 	// update Annotation to set admissionWebhookAnnotationStatusKey: "mutated"
 	patch = append(patch, updateAnnotation(availableAnnotations, annotations)...)
 
 	// read configMap to decide modify the sts
 	securitycontextMap := getConfigMap()
-	if securitycontextMap != nil {
-		if value, ok := securitycontextMap["deployment."+deployment.Name]; ok {
-			// modify
-			var deployTemplate appsv1.Deployment
-			if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", deployment.Namespace, -1)), &deployTemplate); err != nil {
-				glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
-			}
-			// pod level
-			if deployTemplate.Spec.Template.Spec.SecurityContext != nil {
-				// modify /spec/template/spec/securityContext
-				replaceSecurityContext := patchOperation{
-					Op:    "replace",
-					Path:  "/spec/template/spec/securityContext",
-					Value: deployTemplate.Spec.Template.Spec.SecurityContext,
-				}
-				glog.Infof("add Deployment securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
-				patch = append(patch, replaceSecurityContext)
-			}
+	if securitycontextMap == nil {
+		return json.Marshal(patch)
+	}
 
-			// pod level Volumes
-			if len(deployTemplate.Spec.Template.Spec.Volumes) > 0 {
-				// modify /spec/template/spec/volumes
-				replaceVolumes := patchOperation{
-					Op:    "replace",
-					Path:  "/spec/template/spec/volumes",
-					Value: append(deployment.Spec.Template.Spec.Volumes, deployTemplate.Spec.Template.Spec.Volumes...),
-				}
-				glog.Infof("add Deployment Volumes  /spec/template/spec/Volumes for value: %v", replaceVolumes)
-				patch = append(patch, replaceVolumes)
-			}
-			// jiexun pod level affinity
-			if deployTemplate.Spec.Template.Spec.Affinity != nil {
-				if deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-					// modify /spec/template/spec/affinity/podAntiAffinity
-					replacePodAntiAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAntiAffinity",
-						Value: deployTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
-					}
-					glog.Infof("add Deployment Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-					patch = append(patch, replacePodAntiAffinity)
-				}
-				if deployTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-					// modify /spec/template/spec/affinity/podAffinity
-					replacePodAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/podAffinity",
-						Value: deployTemplate.Spec.Template.Spec.Affinity.PodAffinity,
-					}
-					glog.Infof("add Deployment Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-					patch = append(patch, replacePodAffinity)
-				}
-				if deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-					// modify /spec/template/spec/affinity/nodeAffinity
-					replaceNodeAffinity := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/affinity/nodeAffinity",
-						Value: deployTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
-					}
-					glog.Infof("add Deployment Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-					patch = append(patch, replaceNodeAffinity)
-				}
-			}
+	var mapKeyName, objectNamespace string
+	var preVolumes []corev1.Volume
+	var initContainers, containers []corev1.Container
+
+	switch initObject := object.(type) {
+	case *appsv1.Deployment:
+		mapKeyName = "deployment." + initObject.Name
+		objectNamespace = initObject.Namespace
+		preVolumes = initObject.Spec.Template.Spec.Volumes
+		initContainers = initObject.Spec.Template.Spec.InitContainers
+		containers = initObject.Spec.Template.Spec.Containers
+
+	case *appsv1.StatefulSet:
+		mapKeyName = "statefulset." + initObject.Name
+		objectNamespace = initObject.Namespace
+		preVolumes = initObject.Spec.Template.Spec.Volumes
+		initContainers = initObject.Spec.Template.Spec.InitContainers
+		containers = initObject.Spec.Template.Spec.Containers
+	case *batchv1.Job:
+		mapKeyName = "job." + initObject.Name
+		objectNamespace = initObject.Namespace
+		preVolumes = initObject.Spec.Template.Spec.Volumes
+		initContainers = initObject.Spec.Template.Spec.InitContainers
+		containers = initObject.Spec.Template.Spec.Containers
+	}
 
 
-			// initContainers level
-			if len(deployTemplate.Spec.Template.Spec.InitContainers) > 0 {
-				initContainers := deployment.Spec.Template.Spec.InitContainers
-				var initSize = len(initContainers)
-				for i := 0; i < initSize; i++ {
-					for _, val := range deployTemplate.Spec.Template.Spec.InitContainers {
-						if val.Name == initContainers[i].Name {
-							// only add securityContext initcontainers
-							if val.SecurityContext != nil {
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
-								}
-								patch = append(patch, replaceSecurityContext)
-							}
-							// only add Volumes initcontainers
-							if len(val.VolumeMounts) > 0 {
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
-								}
-								patch = append(patch, replaceVolumeMounts)
-							}
-						}
-					}
-				}
-			}
-
-			// containers level
-			if len(deployTemplate.Spec.Template.Spec.Containers) > 0 {
-				containers := deployment.Spec.Template.Spec.Containers
-				var containerSize = len(containers)
-				for i := 0; i < containerSize; i++ {
-					for _, val := range deployTemplate.Spec.Template.Spec.Containers {
-						if val.Name == containers[i].Name {
-							// only add securityContext containers
-							if val.SecurityContext != nil {
-								replaceSecurityContext := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-									Value: val.SecurityContext,
-								}
-								patch = append(patch, replaceSecurityContext)
-							}
-
-							// only add volumeMounts containers
-							if len(val.VolumeMounts) > 0 {
-								replaceVolumeMounts := patchOperation{
-									Op:    "replace",
-									Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-									Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
-								}
-								patch = append(patch, replaceVolumeMounts)
-							}
-
-						}
-					}
-				}
-			}
+	if value, ok := securitycontextMap[mapKeyName]; ok {
+		var specTemplate appsv1.Deployment
+		if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", objectNamespace, -1)), &specTemplate); err != nil {
+			glog.Errorf("Can't json.Unmarshal deployTemplate: %v", err)
 		}
+		// pod level SecurityContext
+		patchPodSecurityContext(&patch, specTemplate.Spec.Template.Spec.SecurityContext)
+		// pod level Volumes
+		patchPodVolumes(&patch, preVolumes, specTemplate.Spec.Template.Spec.Volumes)
+		// pod level affinity
+		patchPodAffinity(&patch, specTemplate.Spec.Template.Spec.Affinity)
+		// initContainers level securityContext volumeMounts
+		patchInitContainers(&patch, specTemplate.Spec.Template.Spec.InitContainers, initContainers)
+		// containers level securityContext volumeMounts
+		patchContainers(&patch, specTemplate.Spec.Template.Spec.Containers, containers)
 	}
 
 	return json.Marshal(patch)
 }
 
-func createStatefulsetAddSecurityContextPatch(statefulset appsv1.StatefulSet, availableAnnotations map[string]string, annotations map[string]string) ([]byte, error) {
-	var patch []patchOperation
-	// update Annotation to set admissionWebhookAnnotationStatusKey: "mutated"
-	patch = append(patch, updateAnnotation(availableAnnotations, annotations)...)
-
-	// read configMap to decide modify the sts
-	statefulset.Spec.Template.Spec.SecurityContext = &corev1.PodSecurityContext{
-		RunAsUser:  &securityContextValue,
-		RunAsGroup: &securityContextValue,
-		FSGroup:    &securityContextValue,
-	}
-	securitycontextMap := getConfigMap()
-	if securitycontextMap != nil {
-		for k, value := range securitycontextMap {
-			if strings.Contains("statefulset."+statefulset.Name, k) {
-				// modify
-				var stsTemplate appsv1.StatefulSet
-				if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", statefulset.Namespace, -1)), &stsTemplate); err != nil {
-					glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
-				}
-				// pod level
-				if stsTemplate.Spec.Template.Spec.SecurityContext != nil {
-					// modify /spec/template/spec/securityContext
-					replaceSecurityContext := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/securityContext",
-						Value: stsTemplate.Spec.Template.Spec.SecurityContext,
-					}
-					glog.Infof("add StatefulSet securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
-					patch = append(patch, replaceSecurityContext)
-				}
-
-				// pod level volumes
-				if len(stsTemplate.Spec.Template.Spec.Volumes) > 0 {
-					// modify /spec/template/spec/volumes
-					replaceVolumes := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/volumes",
-						Value: append(statefulset.Spec.Template.Spec.Volumes, stsTemplate.Spec.Template.Spec.Volumes...),
-					}
-					glog.Infof("add StatefulSet Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
-					patch = append(patch, replaceVolumes)
-				}
-				// jiexun pod level affinity
-				if stsTemplate.Spec.Template.Spec.Affinity != nil {
-					if stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-						// modify /spec/template/spec/affinity/podAntiAffinity
-						replacePodAntiAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/podAntiAffinity",
-							Value: stsTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
-						}
-						glog.Infof("add StatefulSet Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-						patch = append(patch, replacePodAntiAffinity)
-					}
-
-					if stsTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-						// modify /spec/template/spec/affinity/podAffinity
-						replacePodAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/podAffinity",
-							Value: stsTemplate.Spec.Template.Spec.Affinity.PodAffinity,
-						}
-						glog.Infof("add StatefulSet Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-						patch = append(patch, replacePodAffinity)
-					}
-
-					if stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-						// modify /spec/template/spec/affinity/nodeAffinity
-						replaceNodeAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/nodeAffinity",
-							Value: stsTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
-						}
-						glog.Infof("add StatefulSet Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-						patch = append(patch, replaceNodeAffinity)
-					}
-				}
-
-
-				// initContainers level
-				if len(stsTemplate.Spec.Template.Spec.InitContainers) > 0 {
-					initContainers := statefulset.Spec.Template.Spec.InitContainers
-					var initSize = len(initContainers)
-					for i := 0; i < initSize; i++ {
-						for _, val := range stsTemplate.Spec.Template.Spec.InitContainers {
-							if val.Name == initContainers[i].Name {
-								// only add securityContext initcontainers
-								if val.SecurityContext != nil {
-									replaceSecurityContext := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-										Value: val.SecurityContext,
-									}
-									patch = append(patch, replaceSecurityContext)
-								}
-								// only add volumeMounts initcontainers
-								if len(val.VolumeMounts) > 0 {
-									replaceVolumeMounts := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-										Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
-									}
-									patch = append(patch, replaceVolumeMounts)
-								}
-
-							}
-						}
-					}
-				}
-
-				// containers level
-				if len(stsTemplate.Spec.Template.Spec.Containers) > 0 {
-					containers := statefulset.Spec.Template.Spec.Containers
-					var containerSize = len(containers)
-					for i := 0; i < containerSize; i++ {
-						for _, val := range stsTemplate.Spec.Template.Spec.Containers {
-							if val.Name == containers[i].Name {
-								// only add securityContext containers
-								if val.SecurityContext != nil {
-									replaceSecurityContext := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-										Value: val.SecurityContext,
-									}
-									patch = append(patch, replaceSecurityContext)
-								}
-
-								// only add volumeMounts containers
-								if len(val.VolumeMounts) > 0 {
-									replaceVolumeMounts := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-										Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
-									}
-									patch = append(patch, replaceVolumeMounts)
-								}
-
-							}
-						}
-					}
-				}
-			}
-
-		}
-
-	}
-
-	return json.Marshal(patch)
-}
-
-func createJobAddSecurityContextPatch(job batchv1.Job, availableAnnotations map[string]string, annotations map[string]string) ([]byte, error) {
-	var patch []patchOperation
-	// update Annotation to set admissionWebhookAnnotationStatusKey: "mutated"
-	patch = append(patch, updateAnnotation(availableAnnotations, annotations)...)
-
-	// read configMap to decide modify the sts
-	securitycontextMap := getConfigMap()
-	if securitycontextMap != nil {
-		for k, value := range securitycontextMap {
-			if strings.Contains("job."+job.Name, k) {
-				// modify
-				var jobTemplate batchv1.Job
-				if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", job.Namespace, -1)), &jobTemplate); err != nil {
-					glog.Errorf("Can't json.Unmarshal stsTemplate: %v", err)
-				}
-				// pod level
-				if jobTemplate.Spec.Template.Spec.SecurityContext != nil {
-					// modify /spec/template/spec/securityContext
-					replaceSecurityContext := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/securityContext",
-						Value: jobTemplate.Spec.Template.Spec.SecurityContext,
-					}
-					glog.Infof("add Job securityContext  /spec/template/spec/securityContext for value: %v", replaceSecurityContext)
-					patch = append(patch, replaceSecurityContext)
-				}
-
-				// pod level Volumes
-				if len(jobTemplate.Spec.Template.Spec.Volumes) > 0 {
-					// modify /spec/template/spec/volumes
-					replaceVolumes := patchOperation{
-						Op:    "replace",
-						Path:  "/spec/template/spec/volumes",
-						Value: append(job.Spec.Template.Spec.Volumes, jobTemplate.Spec.Template.Spec.Volumes...),
-					}
-					glog.Infof("add Job Volumes  /spec/template/spec/volumes for value: %v", replaceVolumes)
-					patch = append(patch, replaceVolumes)
-				}
-
-				// jiexun pod level affinity
-				if jobTemplate.Spec.Template.Spec.Affinity != nil {
-					if jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-						// modify /spec/template/spec/affinity/podAntiAffinity
-						replacePodAntiAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/podAntiAffinity",
-							Value: jobTemplate.Spec.Template.Spec.Affinity.PodAntiAffinity,
-						}
-						glog.Infof("add Job Affinity podAntiAffinity  /spec/template/spec/affinity/podAntiAffinity for value: %v", replacePodAntiAffinity)
-						patch = append(patch, replacePodAntiAffinity)
-					}
-					if jobTemplate.Spec.Template.Spec.Affinity.PodAffinity != nil {
-						// modify /spec/template/spec/affinity/podAffinity
-						replacePodAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/podAffinity",
-							Value: jobTemplate.Spec.Template.Spec.Affinity.PodAffinity,
-						}
-						glog.Infof("add Job Affinity PodAffinity  /spec/template/spec/affinity/podAffinity for value: %v", replacePodAffinity)
-						patch = append(patch, replacePodAffinity)
-					}
-					if jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity != nil {
-						// modify /spec/template/spec/affinity/nodeAffinity
-						replaceNodeAffinity := patchOperation{
-							Op:    "replace",
-							Path:  "/spec/template/spec/affinity/nodeAffinity",
-							Value: jobTemplate.Spec.Template.Spec.Affinity.NodeAffinity,
-						}
-						glog.Infof("add Job Affinity NodeAffinity  /spec/template/spec/affinity/nodeAffinity for value: %v", replaceNodeAffinity)
-						patch = append(patch, replaceNodeAffinity)
-					}
-				}
-
-				// initContainers level
-				if len(jobTemplate.Spec.Template.Spec.InitContainers) > 0 {
-					initContainers := job.Spec.Template.Spec.InitContainers
-					var initSize = len(initContainers)
-					for i := 0; i < initSize; i++ {
-						for _, val := range jobTemplate.Spec.Template.Spec.InitContainers {
-							if val.Name == initContainers[i].Name {
-								// only add securityContext initcontainers
-								if val.SecurityContext != nil {
-									replaceSecurityContext := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/securityContext",
-										Value: val.SecurityContext,
-									}
-									patch = append(patch, replaceSecurityContext)
-								}
-
-								// only add VolumeMounts initcontainers
-								if len(val.VolumeMounts) > 0 {
-									replaceVolumeMounts := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/initContainers/" + strconv.Itoa(i) + "/volumeMounts",
-										Value: append(initContainers[i].VolumeMounts, val.VolumeMounts...),
-									}
-									patch = append(patch, replaceVolumeMounts)
-								}
-
-							}
-						}
-					}
-				}
-
-				// containers level
-				if len(jobTemplate.Spec.Template.Spec.Containers) > 0 {
-					containers := job.Spec.Template.Spec.Containers
-					var containerSize = len(containers)
-					for i := 0; i < containerSize; i++ {
-						for _, val := range jobTemplate.Spec.Template.Spec.Containers {
-							if val.Name == containers[i].Name {
-								// only add securityContext containers
-								if val.SecurityContext != nil {
-									replaceSecurityContext := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/securityContext",
-										Value: val.SecurityContext,
-									}
-									patch = append(patch, replaceSecurityContext)
-								}
-								// only add VolumeMounts containers
-								if len(val.VolumeMounts) > 0 {
-									replaceVolumeMounts := patchOperation{
-										Op:    "replace",
-										Path:  "/spec/template/spec/containers/" + strconv.Itoa(i) + "/volumeMounts",
-										Value: append(containers[i].VolumeMounts, val.VolumeMounts...),
-									}
-									patch = append(patch, replaceVolumeMounts)
-								}
-
-							}
-						}
-					}
-				}
-			}
-		}
-
-	}
-
-	return json.Marshal(patch)
-}
 
 func updateAnnotation(target map[string]string, added map[string]string) (patch []patchOperation) {
 	for key, value := range added {
