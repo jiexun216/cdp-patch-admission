@@ -186,21 +186,23 @@ func createRuntimeObjectAddContextPatch(object runtime.Object, availableAnnotati
 	}
 
 
-	if value, ok := securitycontextMap[mapKeyName]; ok {
-		var specTemplate appsv1.Deployment
-		if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", objectNamespace, -1)), &specTemplate); err != nil {
-			glog.Errorf("Can't json.Unmarshal deployTemplate: %v", err)
+	for k, value := range securitycontextMap {
+		if strings.Contains(mapKeyName, k) {
+			var specTemplate appsv1.Deployment
+			if err := json.Unmarshal([]byte(strings.Replace(value, "{{namespace}}", objectNamespace, -1)), &specTemplate); err != nil {
+				glog.Errorf("Can't json.Unmarshal deployTemplate: %v", err)
+			}
+			// pod level SecurityContext
+			patchPodSecurityContext(&patch, specTemplate.Spec.Template.Spec.SecurityContext)
+			// pod level Volumes
+			patchPodVolumes(&patch, preVolumes, specTemplate.Spec.Template.Spec.Volumes)
+			// pod level affinity
+			patchPodAffinity(&patch, specTemplate.Spec.Template.Spec.Affinity)
+			// initContainers level securityContext volumeMounts
+			patchInitContainers(&patch, specTemplate.Spec.Template.Spec.InitContainers, initContainers)
+			// containers level securityContext volumeMounts
+			patchContainers(&patch, specTemplate.Spec.Template.Spec.Containers, containers)
 		}
-		// pod level SecurityContext
-		patchPodSecurityContext(&patch, specTemplate.Spec.Template.Spec.SecurityContext)
-		// pod level Volumes
-		patchPodVolumes(&patch, preVolumes, specTemplate.Spec.Template.Spec.Volumes)
-		// pod level affinity
-		patchPodAffinity(&patch, specTemplate.Spec.Template.Spec.Affinity)
-		// initContainers level securityContext volumeMounts
-		patchInitContainers(&patch, specTemplate.Spec.Template.Spec.InitContainers, initContainers)
-		// containers level securityContext volumeMounts
-		patchContainers(&patch, specTemplate.Spec.Template.Spec.Containers, containers)
 	}
 
 	return json.Marshal(patch)
